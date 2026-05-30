@@ -1,7 +1,9 @@
 """
-Web Agent - Citation (क्रेडिट) और Paraphrasing (अपने शब्दों में लिखना) के साथ।
+Web Agent - DuckDuckGo सर्च इंजन के साथ (Robust & Real-time)।
 """
-import requests
+import urllib.request
+import urllib.parse
+import json
 import re
 from ka_mind.core.knowledge_atom import KnowledgeAtom, AtomType
 
@@ -10,34 +12,55 @@ class WebAgent:
         self.memory = memory_graph
 
     def search_and_learn(self, topic: str) -> str:
-        """इंटरनेट से सर्च करना, KAs बनाना और साइटेशन (Source URL) देना"""
-        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{topic.replace(' ', '_')}"
-        source_url = f"https://en.wikipedia.org/wiki/{topic.replace(' ', '_')}"
+        """DuckDuckGo से सर्च करना, KAs बनाना और साइटेशन देना"""
+        thoughts = []
+        thoughts.append(f"🌐 [Web Agent Activated]: DuckDuckGo पर '{topic}' सर्च किया जा रहा है...")
         
         try:
-            response = requests.get(url, timeout=5)
-            if response.status_code != 200:
-                return f"❌ '{topic}' पर जानकारी नहीं मिली।"
+            # DuckDuckGo API URL Setup
+            enc = urllib.parse.quote(topic)
+            url = f"https://api.duckduckgo.com/?q={enc}&format=json&no_html=1"
+            req = urllib.request.Request(url, headers={"User-Agent": "KA-Mind/1.0"})
             
-            raw_text = response.json().get("extract", "")
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = json.loads(r.read().decode())
+                
+            raw_text = data.get("AbstractText", "")
+            source_url = data.get("AbstractURL", "")
+            
+            # अगर Abstract खाली है, तो Related Topics से डेटा उठाओ
+            if not raw_text:
+                for t in data.get("RelatedTopics", []):
+                    if isinstance(t, dict) and "Text" in t:
+                        raw_text += t["Text"] + ". "
+                        if not source_url:
+                            source_url = t.get("FirstURL", "DuckDuckGo")
+                        break
+                        
+            if not raw_text.strip():
+                return f"❌ माफ़ करें, '{topic}' पर कोई सीधा जवाब नहीं मिला।"
+                
+            thoughts.append(f"📖 [Data Extracted]: डेटा मिल गया। Processing into Atoms...")
+            
+            # डेटा को वाक्यों से KAs में तोड़ना
             sentences = re.split(r'(?<=[.!?]) +', raw_text)
+            new_atoms_count = 0
             
-            # 1. डेटा को वाक्यों से KAs में तोड़ना (ताकि कॉपीराइट न लगे)
-            new_atoms = []
             for sentence in sentences:
                 if len(sentence) > 15:
                     atom = KnowledgeAtom(AtomType.FACT, {"text": sentence}, source=source_url)
                     if self.memory.add_atom(atom):
-                        new_atoms.append(atom)
+                        new_atoms_count += 1
+                        
+            thoughts.append(f"🧠 [Learning Complete]: {new_atoms_count} नए Knowledge Atoms ग्राफ में जोड़ दिए गए!")
             
-            # 2. अपने शब्दों में सजी हुई समरी बनाना (Paraphrasing Demo)
+            # फाइनल आउटपुट
             summary = (
-                f"🧠 मैंने '{topic}' के बारे में डेटा को अपने Knowledge Atoms में प्रोसेस कर लिया है।\n"
-                f"💡 **निष्कर्ष:** यह डेटा मुख्य रूप से {topic} की बुनियादी परिभाषा और इसके उपयोग से जुड़ा है। "
-                "मैंने इसके फैक्ट्स को अपनी मेमोरी में स्थायी रूप से स्टोर कर लिया है।\n\n"
-                f"🔗 **Sources (क्रेडिट):**\n[1] {source_url}"
+                f"{chr(10).join(thoughts)}\n\n"
+                f"💡 **निष्कर्ष (KA-Mind Summary):**\n{raw_text[:300]}...\n\n"
+                f"🔗 **Source:** [1] {source_url}"
             )
             return summary
             
         except Exception as e:
-            return f"❌ Error: {e}"
+            return f"❌ Search Error: {e}"
