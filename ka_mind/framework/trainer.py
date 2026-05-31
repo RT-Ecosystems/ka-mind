@@ -1,94 +1,73 @@
 """
-KaTrainer - Updated with Checkpointing, Auto-Resume, and Deduplication!
+KaTrainer - Updated with Multiprocessing Engine for CPU Parallelism!
 """
 import re
 import os
 import json
+import concurrent.futures
+import multiprocessing
 from ka_mind.core.knowledge_atom import KnowledgeAtom, AtomType
+
+# ग्लोबल वर्कर फंक्शन (ताकि Multiprocessing इसे आसानी से पिक कर सके)
+def _process_chunk_worker(args):
+    text_chunk, domain_category = args
+    sentences = re.split(r'(?<=[.!?]) +', text_chunk)
+    local_atoms = []
+    
+    for sentence in sentences:
+        if len(sentence.strip()) > 15:
+            atom = KnowledgeAtom(
+                atom_type=AtomType.FACT, 
+                content={"text": sentence.strip()}, 
+                source="parallel_stream", 
+                category=domain_category
+            )
+            local_atoms.append(atom)
+    return local_atoms
 
 class KaTrainer:
     def __init__(self, model):
         self.model = model
         self.checkpoint_dir = f"./checkpoints/{self.model.name.lower()}"
         os.makedirs(self.checkpoint_dir, exist_ok=True)
+        # CPU कोर्सेस की संख्या पता करना
+        self.cpu_cores = max(1, multiprocessing.cpu_count() - 1)
 
-    def save_checkpoint(self, current_row: int, dataset_name: str):
-        """ट्रेनिंग की प्रोग्रेस को सेव करना (ताकि क्रैश होने पर यहीं से शुरू हो)"""
-        checkpoint_data = {
-            "model_name": self.model.name,
-            "last_dataset": dataset_name,
-            "last_processed_row": current_row
-        }
+    def train_parallel(self, file_path: str, chunk_size: int = 5000):
+        """
+        विशाल टेक्स्ट फाइल को कई CPU कोर्सेस पर एक साथ (Parallel) प्रोसेस करना।
+        """
+        print(f"⚡ [Multiprocessing]: {self.cpu_cores + 1} CPU Cores डिटेक्ट हुए!")
+        print(f"🚀 महा-ट्रेनिंग शुरू... (File: {file_path})")
         
-        # 1. प्रोग्रेस सेव करना
-        with open(f"{self.checkpoint_dir}/progress.json", "w") as f:
-            json.dump(checkpoint_data, f)
-            
-        # 2. मॉडल का दिमाग (Atoms) सेव करना
-        self.model.save(self.checkpoint_dir)
-        print(f"💾 [Checkpoint Saved]: Row {current_row} तक का डेटा सुरक्षित कर लिया गया है!")
-
-    def load_checkpoint(self, dataset_name: str) -> int:
-        """चेक करना कि क्या कोई पुरानी अधूरी ट्रेनिंग है?"""
-        progress_file = f"{self.checkpoint_dir}/progress.json"
-        if os.path.exists(progress_file):
-            with open(progress_file, "r") as f:
-                data = json.load(f)
-            if data.get("last_dataset") == dataset_name:
-                last_row = data.get("last_processed_row", 0)
-                print(f"🔄 [Resume Training]: सर्वर क्रैश रिकवरी! ट्रेनिंग Row {last_row} से वापस शुरू हो रही है...")
-                return last_row
-        return 0
-
-    def train_from_huggingface(self, dataset_path: str, text_column: str = "text", max_rows: int = 1000):
-        try:
-            from datasets import load_dataset
-        except ImportError:
+        if not os.path.exists(file_path):
             return
             
-        # पुरानी प्रोग्रेस चेक करना (Resume)
-        start_row = self.load_checkpoint(dataset_path)
-        
-        dataset = load_dataset(dataset_path, split="train", streaming=True)
-        
         atoms_added = 0
-        merged_duplicates = 0
-        current_row = 0
+        chunks = []
+        current_chunk = ""
         
-        for row in dataset:
-            # अगर यह डेटा हम पहले पढ़ चुके हैं, तो स्किप करो (Skip to start_row)
-            if current_row < start_row:
-                current_row += 1
-                continue
-                
-            if current_row >= start_row + max_rows:
-                break
-                
-            text_data = row.get(text_column, "")
-            sentences = re.split(r'(?<=[.!?]) +', text_data)
+        # 1. फाइल को पढ़ना और चंक्स (Chunks) में तोड़ना
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                current_chunk += line + " "
+                if len(current_chunk) >= chunk_size:
+                    chunks.append((current_chunk, self.model.domain))
+                    current_chunk = ""
+        if current_chunk:
+            chunks.append((current_chunk, self.model.domain))
             
-            for sentence in sentences:
-                if len(sentence.strip()) > 15:
-                    atom = KnowledgeAtom(
-                        atom_type=AtomType.FACT, 
-                        content={"text": sentence.strip()}, 
-                        source=f"HF:{dataset_path}", 
-                        category=self.model.domain
-                    )
-                    
-                    # Deduplication Logic (यहाँ ग्राफ खुद डुप्लीकेट को मर्ज करेगा)
-                    is_new = self.model.memory.add_atom(atom)
-                    if is_new:
+        print(f"📦 डेटा को {len(chunks)} पैकेट्स में बाँटा गया। प्रोसेसिंग शुरू...")
+
+        # 2. Parallel Processing (जादू यहाँ होता है)
+        with concurrent.futures.ProcessPoolExecutor(max_workers=self.cpu_cores) as executor:
+            results = executor.map(_process_chunk_worker, chunks)
+            
+            # 3. सभी CPU कोर्सेस से बने हुए Atoms को मेन मेमोरी ग्राफ में मर्ज करना
+            for atom_list in results:
+                for atom in atom_list:
+                    if self.model.memory.add_atom(atom):
                         atoms_added += 1
-                    else:
-                        merged_duplicates += 1
-            
-            current_row += 1
-            
-            # हर 100 लाइन के बाद ऑटो-सेव (Checkpointing)
-            if current_row % 100 == 0:
-                print(f"  ↳ Processed {current_row} rows | New KAs: {atoms_added} | Merged Duplicates: {merged_duplicates}")
-                self.save_checkpoint(current_row, dataset_path)
-                
-        print(f"✅ ट्रेनिंग सेशन पूरा! {atoms_added} नए ज्ञान जुड़े और {merged_duplicates} पुरानी बातें मजबूत (Merge) हुईं।")
+                        
+        print(f"✅ पैरेलल ट्रेनिंग सफल! {atoms_added} नए Atoms '{self.model.name}' के दिमाग में सेव हो गए।")
         return atoms_added
