@@ -1,37 +1,57 @@
-"""
-KA-Mind: Main CLI Interface with Vision Agent
-"""
-from ka_mind.core.graph_memory import GraphMemory
-from ka_mind.teacher.master_teacher import MasterTeacher
-from ka_mind.agents.web_agent import WebAgent
-from ka_mind.agents.code_agent import CodeAgent
-from ka_mind.agents.vision_agent import VisionAgent
+# KA-Mind v2.0 — Main CLI
+# Technique: NeuraBrain | Library: KA-Mind
+from ka_mind.framework.model import KaModel
+
 
 def main():
-    memory = GraphMemory()
-    web_agent = WebAgent(memory)
-    code_agent = CodeAgent()
-    vision_agent = VisionAgent(memory)
-    
-    teacher = MasterTeacher(memory, web_agent, code_agent, vision_agent)
-    
-    print("="*60)
-    print(" 🧠 Welcome to KA-Mind (Now with Multimodal Vision!)")
-    print("="*60)
-    
+    print('='*60)
+    print(' KA-Mind v2.0 — NeuraBrain Technique')
+    print(' Type :help for commands')
+    print('='*60)
+
+    model = KaModel('KA-Mind', domain='General')
+
     while True:
         try:
-            user_input = input("\n👤 You: ").strip()
-            if user_input.lower() in ['exit', 'quit']:
-                break
+            user_input = input('\nYou: ').strip()
             if not user_input: continue
-            
-            print("\n🤖 KA-Mind Processing...")
-            print("-" * 50)
-            print(teacher.process_request(user_input))
-            print("-" * 50)
+            if user_input.lower() in ['exit','quit']: break
+
+            if user_input.startswith(':train '):
+                path = user_input[7:].strip()
+                model.train_file(path)
+
+            elif user_input.startswith(':learn '):
+                text = user_input[7:].strip()
+                n = model.learn(text)
+                print(f'Learned: {n} new atoms')
+
+            elif user_input == ':sleep':
+                model.deep_sleep()
+
+            elif user_input == ':stats':
+                for k, v in model.stats().items():
+                    print(f'  {k}: {v}')
+
+            elif user_input.startswith(':save'):
+                path = model.save()
+                print(f'Saved: {path}')
+
+            elif user_input == ':help':
+                print(':train <file>  — train on file')
+                print(':learn <text>  — learn text directly')
+                print(':sleep         — deep sleep cycle')
+                print(':stats         — show stats')
+                print(':save          — save model')
+                print('anything else  — ask a question')
+
+            else:
+                answer = model.think(user_input)
+                print(f'KA-Mind: {answer}')
+
         except KeyboardInterrupt:
             break
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     main()

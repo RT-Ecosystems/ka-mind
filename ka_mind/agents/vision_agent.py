@@ -1,46 +1,36 @@
-"""
-Vision Agent - KA-Mind की आँखें और कल्पना (Image Generation).
-"""
+# KA-Mind Vision Agent — Image understanding and generation
 from ka_mind.core.knowledge_atom import KnowledgeAtom, AtomType
+
 
 class VisionAgent:
     def __init__(self, memory_graph):
         self.memory = memory_graph
 
-    def generate_image(self, prompt: str) -> str:
-        thoughts = [f"🎨 [Vision Agent]: '{prompt}' के लिए छवि (Image) की कल्पना कर रहा हूँ..."]
-        
+    def generate_image(self, prompt: str, output: str = 'output.png') -> str:
         try:
             from PIL import Image, ImageDraw
             import hashlib
-            
-            # Simple Lightweight Image Generation (बिना GPU के तुरंत काम करेगा)
-            hx = int(hashlib.md5(prompt.encode()).hexdigest(), 16)
-            r, g, b = (hx>>16)&0xFF, (hx>>8)&0xFF, hx&0xFF
-            
-            w, h = 512, 512
-            img = Image.new("RGB", (w, h), (r, g, b))
+            hx  = int(hashlib.md5(prompt.encode()).hexdigest(), 16)
+            r,g,b = (hx>>16)&0xFF, (hx>>8)&0xFF, hx&0xFF
+            img  = Image.new('RGB', (512, 512), (r, g, b))
             draw = ImageDraw.Draw(img)
-            
-            # कुछ एब्सट्रैक्ट पैटर्न बनाना
-            for i in range(0, w, 40):
-                draw.line([(i,0),(i,h)], fill=(min(r+50,255),g,b), width=2)
-            for j in range(0, h, 40):
-                draw.line([(0,j),(w,j)], fill=(r,min(g+50,255),b), width=2)
-                
-            draw.text((20, h//2), prompt[:50], fill=(255,255,255))
-            
-            filename = f"kamind_image_{hx%1000}.png"
-            img.save(filename)
-            
-            # नॉलेज ग्राफ में इमेज का डेटा सेव करना (Multimodal Atom)
-            atom = KnowledgeAtom(AtomType.FACT, {"image_prompt": prompt, "file": filename}, category="multimodal")
-            self.memory.add_atom(atom)
-            
-            thoughts.append(f"✅ इमेज सफलतापूर्वक बन गई: {filename}")
-            thoughts.append("🧠 [Multimodal Atom] ग्राफ में सेव कर लिया गया।")
-            
-            return "\n".join(thoughts)
-            
+            for i in range(0, 512, 40):
+                draw.line([(i,0),(i,512)], fill=(min(r+40,255),g,b))
+            for j in range(0, 512, 40):
+                draw.line([(0,j),(512,j)], fill=(r,min(g+40,255),b))
+            draw.text((20, 240), prompt[:50], fill=(255,255,255))
+            img.save(output)
+            return f'Image saved: {output}'
         except ImportError:
-            return "❌ Pillow लाइब्रेरी इंस्टॉल नहीं है। रन करें: pip install Pillow"
+            return 'Install Pillow: pip install Pillow'
+
+    def describe_image(self, image_path: str) -> str:
+        try:
+            from ka_mind.core.vector_atom import VectorAtom
+            from PIL import Image
+            encoder = VectorAtom._get_encoder()
+            if encoder:
+                return f'Image at {image_path} — use CLIP for full description.'
+            return f'Image loaded: {image_path}'
+        except Exception as e:
+            return f'Vision error: {e}'
