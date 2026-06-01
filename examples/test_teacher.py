@@ -26,7 +26,7 @@ def run_test():
     
     # 3. विशाल डेटा स्ट्रीमिंग टेस्ट
     print("\n👤 USER: [स्ट्रीमिंग 1000 पन्नों की किताब...]")
-    print(teacher.stream_and_merge_data("आसमान नीला है. पानी गीला होता है. आसमान नीला है."))
+    print(teacher.process_request("आसमान नीला है. पानी गीला होता है. आसमान नीला है."))
     print(f"📊 Memory Status: {memory.memory_stats()}")
     print("="*50 + "\n")
 

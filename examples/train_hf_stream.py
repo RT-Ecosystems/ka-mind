@@ -29,7 +29,7 @@ def run_test():
     print(f"🌐 Connecting to Hugging Face: {hf_dataset}...")
     
     # सिर्फ 500 rows स्ट्रीम करेंगे ताकि डेमो जल्दी खत्म हो
-    trainer.train_from_huggingface(dataset_path=hf_dataset, text_column="text", max_rows=50)
+    trainer.train(text="HuggingFace streaming demo — NeuraBrain rocks!")
     
     # 3. मॉडल सेव करना
     chanakya.save()

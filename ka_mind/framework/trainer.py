@@ -49,3 +49,9 @@ class KaTrainer:
         path = os.path.join(self.chk_dir, 'checkpoint.kamind')
         self.model.save(self.chk_dir)
         return path
+
+    def train(self, text: str) -> int:
+        """Simple single-thread training on a text string."""
+        from ka_mind.training.neurabrain_teacher import NeuraBrainTeacher
+        teacher = NeuraBrainTeacher(self.model.memory)
+        return teacher.process_chunk(text, self.model.domain)
