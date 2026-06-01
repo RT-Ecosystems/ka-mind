@@ -18,6 +18,9 @@ class GraphMemory:
         self.edges[atom.atom_id] = []
         return True
 
+    def add_relation(self, from_id: str, to_id: str, relation: str = 'related', strength: float = 1.0):
+        self.add_edge(from_id, to_id, relation, strength)
+
     def add_edge(self, from_id: str, to_id: str,
                  relation: str = 'related', strength: float = 1.0):
         if from_id in self.edges and to_id in self.graph:
