@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from ka_mind.framework.model import KaModel
 from ka_mind.core.abstractor import Abstractor
 from ka_mind.core.world_model import WorldModel
-from ka_mind.core.memory_ranker import MemoryRanker
+from ka_mind.memory.optimizer import MemoryRanker
 from ka_mind.core.knowledge_atom import KnowledgeAtom, AtomType
 
 def run_test():
