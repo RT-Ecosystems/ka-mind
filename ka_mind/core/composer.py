@@ -1,55 +1,46 @@
-# KA-Mind Composer — Upgraded with HumanLanguageEngine
-# NeuraBrain: Knowledge -> Human-like Language
+# KA-Mind Composer v2.3 — Reasoning integrated
 import random
 from .knowledge_atom import AtomType
 from .human_language_engine import HumanLanguageEngine
+from .reasoning_engine import ReasoningEngine
 
 
 class Composer:
     def __init__(self, graph_memory):
-        self.memory  = graph_memory
-        self.lang    = HumanLanguageEngine()
+        self.memory   = graph_memory
+        self.lang     = HumanLanguageEngine()
+        self.reasoner = ReasoningEngine(graph_memory)
 
     def compose_answer(self, query: str, relevant_atoms: list,
                        style: str = 'auto') -> str:
         if not relevant_atoms:
+            # Try reasoning even without direct matches
+            reasoned = self.reasoner.reason(query)
+            if reasoned:
+                return reasoned
             return self.lang.generate(query, [], style)
 
-        # Sort by confidence, most confident first
         sorted_atoms = sorted(relevant_atoms,
                               key=lambda a: a.confidence, reverse=True)
 
-        # Use HumanLanguageEngine for natural output
-        return self.lang.generate(query, sorted_atoms[:8], style)
+        # Base answer from language engine
+        answer = self.lang.generate(query, sorted_atoms[:8], style)
 
-    def compose_creative(self, query: str,
-                         relevant_atoms: list) -> str:
-        return self.lang.generate(query, relevant_atoms, style='creative')
+        # Enrich with formal reasoning
+        logical = self.reasoner.reason(query)
+        if logical and logical not in answer:
+            answer += f' {logical}'
 
-    def _apply_rules(self, query: str, rules: list) -> list:
-        qw  = set(query.lower().split())
-        out = []
-        for rule in rules:
-            cond = rule.content.get('condition', '')
-            cw   = set(cond.split())
-            if len(qw & cw) / max(len(cw), 1) > 0.3:
-                conc = rule.content.get('conclusion', '')
-                out.append(f'if {cond} then {conc}')
-        return out
+        return answer
+
+    def compose_creative(self, query: str, atoms: list) -> str:
+        return self.lang.generate(query, atoms, style='creative')
 
     def chain_reason(self, premise: str, steps: int = 4) -> list:
-        chain   = [premise]
-        current = premise
-        for _ in range(steps):
-            related = self.memory.search_scored(current, top_k=5)
-            if not related: break
-            rules = [a for a, _ in related
-                     if a.atom_type == AtomType.RULE]
-            applied = self._apply_rules(current, rules)
-            if not applied: break
-            if applied[0] == current: break
-            chain.append(f'  -> {applied[0]}')
-            current = applied[0]
+        chain = self.reasoner.causal_chain(premise, depth=steps)
+        if len(chain) <= 1:
+            derived = self.reasoner.forward_chain(max_steps=2)
+            return [premise] + derived[:2] if derived else [premise]
         return chain
 
     def analogical_reason(self, query: str) -> str:
@@ -57,4 +48,5 @@ class Composer:
         if similar:
             atoms = [a for a, _ in similar]
             return self.lang.generate(query, atoms, 'conversational')
-        return self.lang.generate(query, [], 'conversational')
+        logical = self.reasoner.reason(query)
+        return logical or self.lang.generate(query, [], 'conversational')

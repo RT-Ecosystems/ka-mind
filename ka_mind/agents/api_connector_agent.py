@@ -1,245 +1,254 @@
-# KA-Mind API Connector Agent
-# Auto-detects API type, validates, creates named agent
-# User brings any API key -> agent figures out what it is
+# KA-Mind API Connector Agent v2.3
+# FIXED: sk- collision (OpenAI vs DeepSeek vs OpenRouter)
+# Solution: endpoint verification when prefix is ambiguous
 import urllib.request, urllib.parse, json, re
 from ka_mind.core.knowledge_atom import KnowledgeAtom, AtomType
 
 
 class APIConnectorAgent:
 
-    # Known APIs: how to detect and what they can do
     KNOWN_APIS = {
         'github': {
-            'test_url':   'https://api.github.com/user',
-            'auth_type':  'bearer',
-            'detect_prefix': ['ghp_', 'github_pat_'],
-            'capabilities': ['repos','issues','code search','commits','gists'],
-            'description': 'GitHub — code repos, issues, developer tools'
+            'test_url':      'https://api.github.com/user',
+            'auth_type':     'bearer',
+            'prefix':        ['ghp_', 'github_pat_', 'gho_', 'ghu_'],
+            'ambiguous':     False,
+            'capabilities':  ['repos','issues','code search','commits','gists'],
+            'description':   'GitHub — code repos and developer tools'
         },
         'openai': {
-            'test_url':   'https://api.openai.com/v1/models',
-            'auth_type':  'bearer',
-            'detect_prefix': ['sk-'],
-            'capabilities': ['chat','image generation','embeddings','audio'],
-            'description': 'OpenAI — GPT models, DALL-E, Whisper'
+            'test_url':      'https://api.openai.com/v1/models',
+            'auth_type':     'bearer',
+            'prefix':        ['sk-'],
+            'ambiguous':     True,
+            'capabilities':  ['chat','image generation','embeddings','audio'],
+            'description':   'OpenAI — GPT, DALL-E, Whisper'
         },
-        'slack': {
-            'test_url':   'https://slack.com/api/auth.test',
-            'auth_type':  'bearer',
-            'detect_prefix': ['xoxb-', 'xoxp-', 'xoxa-'],
-            'capabilities': ['send message','read channels','search messages'],
-            'description': 'Slack — team messaging'
+        'anthropic': {
+            'test_url':      'https://api.anthropic.com/v1/models',
+            'auth_type':     'x-api-key',
+            'prefix':        ['sk-ant-'],
+            'ambiguous':     False,
+            'capabilities':  ['chat','analysis','coding'],
+            'description':   'Anthropic — Claude models'
         },
-        'telegram': {
-            'test_url':   'https://api.telegram.org/bot{key}/getMe',
-            'auth_type':  'url_param',
-            'detect_prefix': [],
-            'capabilities': ['send message','bot control','notifications'],
-            'description': 'Telegram Bot API'
+        'deepseek': {
+            'test_url':      'https://api.deepseek.com/v1/models',
+            'auth_type':     'bearer',
+            'prefix':        ['sk-'],
+            'ambiguous':     True,
+            'capabilities':  ['chat','code generation','reasoning'],
+            'description':   'DeepSeek — powerful reasoning model'
         },
-        'notion': {
-            'test_url':   'https://api.notion.com/v1/users/me',
-            'auth_type':  'bearer',
-            'detect_prefix': ['secret_'],
-            'capabilities': ['pages','databases','blocks'],
-            'description': 'Notion — notes and databases'
-        },
-        'weather': {
-            'test_url':   'https://api.openweathermap.org/data/2.5/weather?q=London&appid={key}',
-            'auth_type':  'url_param',
-            'detect_prefix': [],
-            'capabilities': ['current weather','forecast','alerts'],
-            'description': 'OpenWeatherMap — weather data'
+        'openrouter': {
+            'test_url':      'https://openrouter.ai/api/v1/models',
+            'auth_type':     'bearer',
+            'prefix':        ['sk-or-'],
+            'ambiguous':     False,
+            'capabilities':  ['multi-model routing','100+ models'],
+            'description':   'OpenRouter — access any AI model'
         },
         'huggingface': {
-            'test_url':   'https://huggingface.co/api/whoami',
-            'auth_type':  'bearer',
-            'detect_prefix': ['hf_'],
-            'capabilities': ['models','datasets','inference'],
-            'description': 'HuggingFace — AI models hub'
+            'test_url':      'https://huggingface.co/api/whoami',
+            'auth_type':     'bearer',
+            'prefix':        ['hf_'],
+            'ambiguous':     False,
+            'capabilities':  ['models','datasets','inference'],
+            'description':   'HuggingFace — AI models hub'
         },
+        'slack': {
+            'test_url':      'https://slack.com/api/auth.test',
+            'auth_type':     'bearer',
+            'prefix':        ['xoxb-','xoxp-','xoxa-'],
+            'ambiguous':     False,
+            'capabilities':  ['messaging','channels','search'],
+            'description':   'Slack — team messaging'
+        },
+        'notion': {
+            'test_url':      'https://api.notion.com/v1/users/me',
+            'auth_type':     'bearer_notion',
+            'prefix':        ['secret_','ntn_'],
+            'ambiguous':     False,
+            'capabilities':  ['pages','databases','blocks'],
+            'description':   'Notion — notes and databases'
+        },
+        'weather': {
+            'test_url':      'https://api.openweathermap.org/data/2.5/weather?q=London&appid={key}',
+            'auth_type':     'url_param',
+            'prefix':        [],
+            'ambiguous':     False,
+            'capabilities':  ['current weather','forecast'],
+            'description':   'OpenWeatherMap — weather data'
+        },
+        'telegram': {
+            'test_url':      'https://api.telegram.org/bot{key}/getMe',
+            'auth_type':     'url_param',
+            'prefix':        [],
+            'ambiguous':     False,
+            'capabilities':  ['bot messaging','notifications'],
+            'description':   'Telegram Bot API'
+        },
+    }
+
+    # APIs that share the same prefix → need endpoint verification
+    AMBIGUOUS_GROUPS = {
+        'sk-': ['openai', 'deepseek'],   # sk-or- handled separately (more specific)
     }
 
     def __init__(self, memory_graph):
         self.memory     = memory_graph
-        self.registered = {}  # name -> {key, capabilities}
+        self.registered = {}
 
     def handle(self, query: str) -> str:
-        q = query.lower()
-        # Extract API key from query
         key_match = re.search(
-            r'(?:key|token|api)[:\s]+([A-Za-z0-9_\-\.]{10,})', query,
-            re.IGNORECASE)
-        if not key_match:
-            # Maybe the key IS the query (user pasted it)
-            words = query.split()
-            candidates = [w for w in words if len(w) > 15
-                          and not w.lower().startswith(('connect','add','api'))]
-            if candidates:
-                api_key = candidates[0]
-            else:
-                return self._help_message()
-        else:
+            r'(?:key|token|api)[:\s]+([A-Za-z0-9_\-\.]{10,})',
+            query, re.IGNORECASE)
+        if key_match:
             api_key = key_match.group(1).strip()
-
-        # Check if name hint given
+        else:
+            words = query.split()
+            candidates = [w for w in words
+                          if len(w) > 12
+                          and not w.lower().startswith(
+                              ('connect','add','api','use'))]
+            if not candidates:
+                return self._help_message()
+            api_key = candidates[0]
         name_hint = None
         for api_name in self.KNOWN_APIS:
-            if api_name in q:
+            if api_name in query.lower():
                 name_hint = api_name
                 break
-
         return self.add_api(api_key, name_hint)
 
     def add_api(self, api_key: str, api_name: str = None) -> str:
-        # Step 1: Auto-detect if no name given
         if not api_name:
-            api_name = self._detect_by_prefix(api_key)
-
-        # Step 2: Try to verify
-        if api_name and api_name in self.KNOWN_APIS:
-            is_valid = self._verify(api_key, api_name)
-        else:
-            # Try all APIs to find which one this key works for
-            api_name, is_valid = self._try_all(api_key)
-
-        if not is_valid or not api_name:
-            return ('API key could not be verified. '
-                    'Supported: ' + ', '.join(self.KNOWN_APIS.keys()))
-
-        # Step 3: Register
+            api_name = self._detect(api_key)
+        if not api_name:
+            return ('Could not detect API type. Supported: '
+                    + ', '.join(self.KNOWN_APIS.keys()))
+        is_valid = self._verify(api_key, api_name)
+        if not is_valid:
+            return f'API key verification failed for {api_name}.'
         info = self.KNOWN_APIS[api_name]
-        self.registered[api_name] = {
-            'key': api_key,
-            'capabilities': info['capabilities'],
-            'description': info['description']
-        }
-        # Save to memory
+        self.registered[api_name] = {'key': api_key,
+                                      'capabilities': info['capabilities']}
         self.memory.add_atom(KnowledgeAtom(AtomType.FACT,
             {'text': f'{api_name} API connected',
-             'api_name': api_name,
-             'capabilities': ', '.join(info['capabilities']),
-             'safe': True}, 0.99, 'api_agent'))
-
+             'api': api_name, 'safe': True}, 0.99, 'api_agent'))
         caps = ', '.join(info['capabilities'])
-        return (
-            f'✅ {api_name.upper()} API connected!\n'
-            f'Description: {info["description"]}\n'
-            f'Capabilities: {caps}\n'
-            f'Usage: ask me to use {api_name} for any task.'
-        )
+        return (f'Connected: {api_name.upper()}\n'
+                f'Info: {info["description"]}\n'
+                f'Can do: {caps}')
 
-    def _detect_by_prefix(self, key: str) -> str:
-        for name, config in self.KNOWN_APIS.items():
-            for prefix in config.get('detect_prefix', []):
+    def _detect(self, key: str) -> str:
+        # Step 1: More specific prefixes first (sk-or- before sk-)
+        specific_first = sorted(
+            self.KNOWN_APIS.items(),
+            key=lambda x: max((len(p) for p in x[1]['prefix']), default=0),
+            reverse=True
+        )
+        # Step 2: Find all matching APIs
+        matches = []
+        for name, config in specific_first:
+            for prefix in config['prefix']:
                 if key.startswith(prefix):
-                    return name
-        return None
+                    matches.append(name)
+                    break
+        if not matches:
+            return self._try_all(key)
+        if len(matches) == 1:
+            return matches[0]
+        # Step 3: Ambiguous (multiple matches) → verify each
+        print(f'  Ambiguous prefix. Testing endpoints: {matches}...')
+        for name in matches:
+            if self._verify(key, name):
+                print(f'  Detected: {name}')
+                return name
+        return matches[0]
 
     def _verify(self, key: str, api_name: str) -> bool:
-        config  = self.KNOWN_APIS[api_name]
-        url     = config['test_url'].replace('{key}', key)
-        auth_type = config['auth_type']
+        config    = self.KNOWN_APIS.get(api_name, {})
+        url       = config.get('test_url','').replace('{key}', key)
+        auth_type = config.get('auth_type','bearer')
+        if not url: return False
         try:
+            headers = {'User-Agent': 'KA-Mind/2.3'}
             if auth_type == 'bearer':
-                req = urllib.request.Request(
-                    url, headers={'Authorization': f'Bearer {key}',
-                                  'User-Agent': 'KA-Mind/2.2'})
-            else:
-                req = urllib.request.Request(
-                    url, headers={'User-Agent': 'KA-Mind/2.2'})
-            with urllib.request.urlopen(req, timeout=8) as r:
+                headers['Authorization'] = f'Bearer {key}'
+            elif auth_type == 'x-api-key':
+                headers['x-api-key'] = key
+                headers['anthropic-version'] = '2023-06-01'
+            elif auth_type == 'bearer_notion':
+                headers['Authorization'] = f'Bearer {key}'
+                headers['Notion-Version'] = '2022-06-28'
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=6) as r:
                 return r.status == 200
         except urllib.error.HTTPError as e:
-            return e.code not in [401, 403]  # 404 still means key works
+            return e.code not in [401, 403]
         except Exception:
             return False
 
-    def _try_all(self, key: str):
-        # Prefix detection first (fast)
-        detected = self._detect_by_prefix(key)
-        if detected:
-            return detected, self._verify(key, detected)
-        # Try each API (slower)
-        for name in ['github', 'openai', 'slack', 'notion', 'huggingface']:
+    def _try_all(self, key: str) -> str:
+        order = ['github','openai','anthropic','deepseek','huggingface',
+                 'slack','notion','openrouter']
+        for name in order:
             if self._verify(key, name):
-                return name, True
-        return None, False
+                return name
+        return None
 
     def use_github(self, command: str) -> str:
         if 'github' not in self.registered:
-            return 'GitHub API not connected. Say: connect github api <your-token>'
+            return 'GitHub not connected. Say: connect github api <token>'
         key = self.registered['github']['key']
         cmd = command.lower()
-
         if 'my repos' in cmd or 'list repos' in cmd:
-            return self._github_api('/user/repos?per_page=10', key)
-        if 'issues' in cmd:
-            m = re.search(r'([\w-]+)/([\w-]+)', command)
-            if m:
-                return self._github_api(f'/repos/{m.group(1)}/{m.group(2)}/issues', key)
-        if 'profile' in cmd or 'user' in cmd:
-            return self._github_api('/user', key)
+            return self._gh('/user/repos?per_page=10', key)
+        if 'profile' in cmd or 'user info' in cmd:
+            return self._gh('/user', key)
+        m = re.search(r'([\w-]+)/([\w-]+)', command)
+        if 'issues' in cmd and m:
+            return self._gh(f'/repos/{m.group(1)}/{m.group(2)}/issues', key)
         if 'search' in cmd:
             q = urllib.parse.quote(re.sub(r'search|github','',cmd).strip())
-            return self._github_api(f'/search/repositories?q={q}&per_page=5', key)
-        return 'GitHub: say repos/issues/profile/search'
+            return self._gh(f'/search/repositories?q={q}&per_page=5', key)
+        return 'GitHub: say repos / issues / profile / search'
 
-    def _github_api(self, endpoint: str, key: str) -> str:
+    def _gh(self, endpoint: str, key: str) -> str:
         try:
-            url = f'https://api.github.com{endpoint}'
-            req = urllib.request.Request(url, headers={
-                'Authorization': f'Bearer {key}',
-                'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': 'KA-Mind/2.2'})
+            req = urllib.request.Request(
+                f'https://api.github.com{endpoint}',
+                headers={'Authorization': f'Bearer {key}',
+                         'Accept': 'application/vnd.github.v3+json',
+                         'User-Agent': 'KA-Mind/2.3'})
             with urllib.request.urlopen(req, timeout=10) as r:
                 data = json.loads(r.read().decode())
             if isinstance(data, list):
-                results = []
+                lines = []
                 for item in data[:5]:
-                    name = item.get('name') or item.get('title', '')
-                    url  = item.get('html_url', '')
-                    results.append(f'  - {name}: {url}')
-                return '\n'.join(results) if results else 'No results.'
-            else:
-                login = data.get('login', data.get('full_name', ''))
-                name  = data.get('name', '')
-                return f'GitHub User: {login} ({name})'
+                    n = item.get('name') or item.get('title','')
+                    u = item.get('html_url','')
+                    lines.append(f'  - {n}: {u}')
+                return '\n'.join(lines) or 'Empty.'
+            login = data.get('login', data.get('full_name',''))
+            name  = data.get('name','')
+            bio   = data.get('bio','') or ''
+            return f'GitHub: {login} ({name}). {bio}'
         except Exception as e:
-            return f'GitHub API error: {e}'
-
-    def use_weather(self, city: str) -> str:
-        if 'weather' not in self.registered:
-            return 'Weather API not connected.'
-        key = self.registered['weather']['key']
-        try:
-            enc = urllib.parse.quote(city)
-            url = f'https://api.openweathermap.org/data/2.5/weather?q={enc}&appid={key}&units=metric'
-            req = urllib.request.Request(url)
-            with urllib.request.urlopen(req, timeout=10) as r:
-                data = json.loads(r.read().decode())
-            temp = data['main']['temp']
-            desc = data['weather'][0]['description']
-            hum  = data['main']['humidity']
-            return f'{city}: {temp}°C, {desc}, Humidity: {hum}%'
-        except Exception as e:
-            return f'Weather error: {e}'
+            return f'GitHub error: {e}'
 
     def list_connected(self) -> str:
-        if not self.registered:
-            return 'No APIs connected yet.'
+        if not self.registered: return 'No APIs connected.'
         lines = ['Connected APIs:']
         for name, info in self.registered.items():
-            caps = ', '.join(info['capabilities'][:3])
-            lines.append(f'  {name.upper()}: {caps}')
+            lines.append(f'  {name.upper()}: {info["capabilities"][:2]}')
         return '\n'.join(lines)
 
     def _help_message(self) -> str:
-        supported = ', '.join(self.KNOWN_APIS.keys())
-        return (
-            f'API Connector Usage:\n'
-            f'  connect github api ghp_yourtoken\n'
-            f'  connect slack api xoxb-yourtoken\n'
-            f'  api key sk-yourkey\n'
-            f'Supported: {supported}'
-        )
+        return ('API Connector:\n'
+                '  connect github api ghp_token\n'
+                '  connect openai api sk-token\n'
+                '  connect deepseek api sk-token\n'
+                '  connect slack api xoxb-token\n'
+                'Supported: ' + ', '.join(self.KNOWN_APIS.keys()))

@@ -1,8 +1,9 @@
-# KA-Mind Model v2.2 — APIConnectorAgent added
+# KA-Mind Model v2.3 — Reasoning Engine integrated
 import pickle, os, re
 from ka_mind.core.graph_memory       import GraphMemory
 from ka_mind.core.vector_graph       import VectorGraph
 from ka_mind.core.neocortex          import Neocortex
+from ka_mind.core.reasoning_engine   import ReasoningEngine
 from ka_mind.core.composer           import Composer
 from ka_mind.core.world_model        import WorldModel
 from ka_mind.core.abstractor         import Abstractor
@@ -20,16 +21,16 @@ from ka_mind.teacher.master_teacher  import MasterTeacher
 
 class KaModel:
     def __init__(self, name: str, domain: str = 'General'):
-        self.name    = name
-        self.domain  = domain
-        self.version = '2.2'
+        self.name     = name
+        self.domain   = domain
+        self.version  = '2.3'
         self.memory       = GraphMemory()
         self.vector_graph = VectorGraph()
         self.neocortex    = Neocortex(self.memory)
+        self.reasoner     = ReasoningEngine(self.memory)
         self.composer     = Composer(self.memory)
         self.world        = WorldModel(self.memory)
         self.abstractor   = Abstractor(self.memory)
-        # All 10 agents
         self.web        = WebAgent(self.memory)
         self.code       = CodeAgent()
         self.vision     = VisionAgent(self.memory)
@@ -38,26 +39,29 @@ class KaModel:
         self.mem_agent  = MemoryAgent(self.memory)
         self.translator = TranslatorAgent()
         self.time       = TimeAgent()
-        self.api        = APIConnectorAgent(self.memory)  # NEW v2.2
+        self.api        = APIConnectorAgent(self.memory)
         self.teacher    = MasterTeacher(
             self.memory, self.web, self.code, self.vision,
             self.vector_graph, self.math, self.file_agent,
             self.mem_agent, self.translator, self.time,
             api_agent=self.api
         )
-        print(f'KaModel {name} v{self.version} | domain={domain} | 10 agents active')
+        print(f'KaModel {name} v{self.version} | domain={domain} | 10 agents | reasoning active')
 
     def think(self, q: str, user_id: str = 'system') -> str:
         return self.teacher.process_request(q, user_id)
+
+    def reason(self, query: str) -> str:
+        return self.reasoner.reason(query)
+
+    def why(self, observation: str) -> list:
+        return self.reasoner.abduction(observation)
 
     def connect_api(self, api_key: str, api_name: str = None) -> str:
         return self.api.add_api(api_key, api_name)
 
     def use_github(self, command: str) -> str:
         return self.api.use_github(command)
-
-    def weather(self, city: str) -> str:
-        return self.api.use_weather(city)
 
     def learn(self, text: str) -> int:
         from ka_mind.training.neurabrain_teacher import NeuraBrainTeacher
@@ -90,15 +94,13 @@ class KaModel:
 
     def save(self, path: str = './models') -> str:
         os.makedirs(path, exist_ok=True)
-        fp = os.path.join(path,
-                          f'{self.name.lower()}_v{self.version}.kamind')
+        fp = os.path.join(path, f'{self.name.lower()}_v{self.version}.kamind')
         with open(fp, 'wb') as f:
             pickle.dump({'name': self.name, 'domain': self.domain,
                          'graph': self.memory.graph,
                          'edges': self.memory.edges,
                          'version': self.version}, f)
-        sz = os.path.getsize(fp) / 1024 / 1024
-        print(f'Saved: {fp} ({sz:.1f} MB)')
+        print(f'Saved: {fp} ({os.path.getsize(fp)/1024/1024:.1f} MB)')
         return fp
 
     @classmethod
@@ -112,10 +114,5 @@ class KaModel:
         return m
 
     def __repr__(self):
-        apis = self.api.registered.keys()
-        return (
-            f'KaModel({self.name} v{self.version} | '
-            f'atoms={len(self.memory.graph):,} | '
-            f'APIs={list(apis) if apis else "none"} | '
-            f'domain={self.domain})'
-        )
+        return (f'KaModel({self.name} v{self.version} | '
+                f'atoms={len(self.memory.graph):,} | domain={self.domain})')
