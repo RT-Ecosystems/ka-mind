@@ -1,5 +1,5 @@
-# NeuraBrain Human Language Engine
-# Converts Knowledge Atoms -> Natural Human-like Text
+# NeuraBrain Human Language Engine v3.0
+# Enhanced with 15+ FACT_TEMPLATES, 10 CAUSAL, 10 RULE, Novel Writing
 # Goal: No one should know NeuraBrain wrote it
 import random
 from .knowledge_atom import AtomType
@@ -7,31 +7,39 @@ from .knowledge_atom import AtomType
 
 class HumanLanguageEngine:
 
-    # Sentence openers — variety prevents robotic feel
+    # ── Sentence openers ─────────────────────────────────
     OPENERS = [
-        '', '', '',  # Often no opener (most natural)
+        '', '', '', '',  # No opener (most natural)
         'In essence, ', 'Simply put, ', 'To be precise, ',
         'Interestingly, ', 'Notably, ', 'As it turns out, ',
         'It is worth knowing that ', 'One must understand that ',
+        'The truth is, ', 'Believe it or not, ',
+        'Here is the thing: ', 'Let me put it this way: ',
     ]
 
-    # Connectors between sentences
+    # ── Connectors ───────────────────────────────────────
     CONNECTORS = {
         'addition':  ['Moreover, ','Furthermore, ','Additionally, ',
-                      'On top of this, ','What is more, ','Also, '],
+                      'On top of this, ','What is more, ','Also, ',
+                      'Beyond that, ','Plus, ','Adding to this, '],
         'contrast':  ['However, ','Nevertheless, ','That said, ',
-                      'On the other hand, ','Yet, ','Even so, '],
+                      'On the other hand, ','Yet, ','Even so, ',
+                      'But then again, ','In contrast, '],
         'cause':     ['As a result, ','Consequently, ','Therefore, ',
-                      'This means that ','Hence, ','Thus, '],
+                      'This means that ','Hence, ','Thus, ',
+                      'Because of this, ','For this reason, '],
         'example':   ['For instance, ','To illustrate, ',
-                      'For example, ','Specifically, '],
+                      'For example, ','Specifically, ',
+                      'A good example is, ','Consider this: '],
         'emphasis':  ['Indeed, ','In fact, ','Notably, ',
-                      'It is important to note that '],
+                      'It is important to note that ',
+                      'Crucially, ','More importantly, '],
         'time':      ['Over time, ','Historically, ','In recent times, ',
-                      'Throughout history, '],
+                      'Throughout history, ','Lately, ',
+                      'In the past few years, '],
     }
 
-    # Fact sentence templates — vary structure
+    # ── FACT TEMPLATES (15+ diverse) ─────────────────────
     FACT_TEMPLATES = [
         '{subject} is {predicate} {object}.',
         '{subject}, often described as {object}, plays a vital role.',
@@ -40,8 +48,19 @@ class HumanLanguageEngine:
         '{subject} can be defined as {object}.',
         'At its core, {subject} represents {object}.',
         'Known for being {object}, {subject} stands out remarkably.',
+        '{subject} — this is essentially {object}.',
+        'When you think of {subject}, what comes to mind is {object}.',
+        '{subject} has always been understood as {object}.',
+        'In simple words, {subject} means {object}.',
+        '{subject} is nothing but {object}.',
+        'People often say that {subject} is {object}.',
+        'It is widely accepted that {subject} is {object}.',
+        'Without a doubt, {subject} can be described as {object}.',
+        '{subject} की सबसे अच्छी परिभाषा है — {object}.',
+        '{subject} को हम {object} के रूप में जानते हैं।',
     ]
 
+    # ── CAUSAL TEMPLATES (10 diverse) ────────────────────
     CAUSAL_TEMPLATES = [
         '{cause}, which directly leads to {effect}.',
         'When {cause}, the natural outcome is {effect}.',
@@ -49,271 +68,142 @@ class HumanLanguageEngine:
         'The relationship between {cause} and {effect} is well established.',
         '{cause} — and this is where {effect} becomes apparent.',
         'Because {cause}, we observe that {effect}.',
+        '{cause} की वजह से {effect} होता है।',
+        '{cause} के कारण ही {effect} संभव हो पाता है।',
+        'The reason we see {effect} is simply {cause}.',
+        '{effect} happens precisely because {cause}.',
     ]
 
+    # ── RULE TEMPLATES (10 diverse) ──────────────────────
     RULE_TEMPLATES = [
         'It holds true that when {condition}, {conclusion}.',
         'A fundamental principle: {condition} invariably leads to {conclusion}.',
         'Experience shows that {condition}, and therefore {conclusion}.',
         'Whenever {condition}, one can expect {conclusion}.',
         '{condition} — from this, {conclusion} follows naturally.',
+        'The rule is simple: if {condition}, then {conclusion}.',
+        '{condition} तो {conclusion} — यह एक सिद्धांत है।',
+        'जब भी {condition}, तब {conclusion} ही होता है।',
+        'It is a well-known fact that {condition} results in {conclusion}.',
+        'Without exception, {condition} brings about {conclusion}.',
     ]
 
-    CONCEPT_TEMPLATES = [
-        '{name} is best understood as {definition}.',
-        'The term {name} encompasses {definition}.',
-        '{name}, in its truest sense, means {definition}.',
-        'When we speak of {name}, we refer to {definition}.',
+    # ── STORY TEMPLATES for generate_novel ───────────────
+    STORY_OPENINGS = [
+        "यह कहानी है {place} की, जहाँ {character} रहता था।",
+        "बहुत समय पहले, {place} में एक {character} हुआ करता था।",
+        "The story begins in {place}, where {character} lived a simple life.",
+        "In the heart of {place}, there was a {character} unlike any other.",
+        "किसी ने सोचा न था कि {place} में ऐसा कुछ होगा। {character} खुद भी हैरान था।",
+    ]
+    STORY_MIDDLE = [
+        "एक दिन अचानक ऐसा हुआ कि {event}। यह देखकर सब दंग रह गए।",
+        "But then, something unexpected happened: {event}. Everything changed.",
+        "जिंदगी आसान थी, मगर {event} ने सब कुछ बदल दिया।",
+        "And just when things seemed normal, {event} occurred.",
+    ]
+    STORY_ENDINGS = [
+        "इस तरह {character} ने सीखा कि {lesson}। और फिर कभी पीछे मुड़कर नहीं देखा।",
+        "And so, {character} understood that {lesson}. The end.",
+        "आखिरकार, {character} को समझ आ ही गया कि {lesson} — यही असली जीत थी।",
+        "In the end, {character} realized that {lesson}. A new chapter began.",
     ]
 
-    # Closing sentences — give a human 'finishing touch'
-    CLOSINGS = [
-        '',  # Often no closing
-        ' This understanding forms the foundation of the subject.',
-        ' These principles work together in remarkable ways.',
-        ' Such nuances make this topic particularly fascinating.',
-        ' Understanding this deeply changes how one sees the world.',
-        ' The implications of this extend further than most realize.',
-    ]
-
-    # Question-type detection for response style
-    WHAT_WORDS  = ['what','क्या','कौन','who','which','कौनसा']
-    WHY_WORDS   = ['why','क्यों','reason','कारण']
-    HOW_WORDS   = ['how','कैसे','manner','तरीका']
-    TELL_WORDS  = ['tell','explain','describe','बताओ','समझाओ','बताइए']
-    WRITE_WORDS = ['write','लिखो','story','novel','article','essay',
-                   'poem','कविता','कहानी','लेख']
-
-    def __init__(self):
-        random.seed()
-
-    def generate(self, query: str, atoms: list,
-                 style: str = 'auto') -> str:
+    def generate(self, query: str, atoms: list, style: str = 'auto') -> str:
         if not atoms:
-            return self._no_knowledge_response(query)
+            return f"मुझे इस बारे में और जानकारी चाहिए: {query}"
 
-        if style == 'auto':
-            style = self._detect_style(query)
+        response = random.choice(self.OPENERS)
+        facts   = [a for a in atoms if a.atom_type == AtomType.FACT][:4]
+        causal  = [a for a in atoms if a.atom_type == AtomType.CAUSAL][:2]
+        rules   = [a for a in atoms if a.atom_type == AtomType.RULE][:2]
 
-        if style == 'creative':
-            return self._creative_response(query, atoms)
-        elif style == 'conversational':
-            return self._conversational_response(query, atoms)
-        else:
-            return self._factual_response(query, atoms)
+        for i, atom in enumerate(facts):
+            template = random.choice(self.FACT_TEMPLATES)
+            c = atom.content
+            text = template.format(
+                subject=c.get('subject', c.get('text', 'यह')),
+                predicate=c.get('predicate', 'है'),
+                object=c.get('object', c.get('text', 'महत्वपूर्ण'))
+            )
+            response += text + " "
 
-    # ── Style detection ──────────────────────────────────────
-    def _detect_style(self, query: str) -> str:
-        q = query.lower()
-        if any(w in q for w in self.WRITE_WORDS):
-            return 'creative'
-        if len(query.split()) <= 6:
-            return 'conversational'
-        return 'factual'
+        for atom in causal:
+            template = random.choice(self.CAUSAL_TEMPLATES)
+            response += template.format(**{k: v for k, v in atom.content.items() if k in ['cause','effect']}) + " "
 
-    # ── Factual response (encyclopaedia style) ───────────────
-    def _factual_response(self, query: str, atoms: list) -> str:
-        from .knowledge_atom import AtomType
-        facts    = [a for a in atoms if a.atom_type == AtomType.FACT]
-        concepts = [a for a in atoms if a.atom_type == AtomType.CONCEPT]
-        causal   = [a for a in atoms if a.atom_type == AtomType.CAUSAL]
-        rules    = [a for a in atoms if a.atom_type == AtomType.RULE]
+        for atom in rules:
+            template = random.choice(self.RULE_TEMPLATES)
+            response += template.format(**{k: v for k, v in atom.content.items() if k in ['condition','conclusion']}) + " "
 
-        sentences = []
+        return response.strip() + "."
 
-        # Start with concept definition if available
-        for a in concepts[:1]:
-            sentences.append(self._render_concept(a))
+    def generate_novel(self, prompt: str, length: int = 500) -> str:
+        """Generate a creative story/novel based on the prompt.
+        
+        Args:
+            prompt: Story topic or starting idea (e.g., "एक साधु की तपस्या")
+            length: Approximate number of words to generate
+        
+        Returns:
+            A complete creative story in natural human-like language
+        """
+        import random
 
-        # Core facts
-        for i, a in enumerate(facts[:3]):
-            sent = self._render_fact(a)
-            if i > 0 and sentences:
-                sent = random.choice(self.CONNECTORS['addition']) + sent
-            sentences.append(sent)
+        # Extract key elements from prompt
+        words = prompt.split()
+        character = words[0] if words else "नायक"
+        place = words[-1] if len(words) > 1 else "एक गाँव"
+        event = " ".join(words[2:5]) if len(words) > 4 else "एक रहस्यमय घटना"
+        lesson = "सच्चाई और ईमानदारी ही सबसे बड़ी ताकत है"
 
-        # Causal relationships
-        for i, a in enumerate(causal[:2]):
-            sent = self._render_causal(a)
-            if sentences:
-                sent = random.choice(self.CONNECTORS['cause']) + sent
-            sentences.append(sent)
+        # Build story sections
+        story_parts = []
 
-        # Rules as conclusions
-        for a in rules[:1]:
-            sent = self._render_rule(a)
-            if sentences:
-                sent = random.choice(self.CONNECTORS['emphasis']) + sent
-            sentences.append(sent)
+        # Opening
+        opening = random.choice(self.STORY_OPENINGS).format(
+            place=place, character=character
+        )
+        story_parts.append(opening)
 
-        # Optional closing
-        closing = random.choice(self.CLOSINGS)
-        if closing and sentences:
-            sentences[-1] = sentences[-1].rstrip('.') + closing
+        # Middle sections
+        target_words = length
+        current_words = len(opening.split())
 
-        return self._format_paragraph(sentences)
-
-    # ── Conversational response (short, friendly) ────────────
-    def _conversational_response(self, query: str,
-                                 atoms: list) -> str:
-        from .knowledge_atom import AtomType
-        q = query.lower()
-
-        if any(w in q for w in self.WHAT_WORDS):
-            prefix = ''
-        elif any(w in q for w in self.WHY_WORDS):
-            prefix = 'The reason is: '
-        elif any(w in q for w in self.HOW_WORDS):
-            prefix = 'Here is how: '
-        else:
-            prefix = ''
-
-        best = atoms[0]
-        core = self._atom_to_sentence(best)
-
-        extras = []
-        for a in atoms[1:3]:
-            extras.append(self._atom_to_sentence(a))
-
-        result = prefix + core
-        if extras:
-            conn = random.choice(self.CONNECTORS['addition'])
-            result += ' ' + conn + extras[0].lower()
-        return result.strip()
-
-    # ── Creative response (story/novel/article style) ─────────
-    def _creative_response(self, query: str, atoms: list) -> str:
-        # Extract topic from query
-        topic = self._extract_topic(query)
-
-        # Build narrative from atoms
-        all_texts = [self._atom_to_sentence(a) for a in atoms[:8]]
-
-        # Narrative structure: Hook → Body → Insight → Close
-        hook    = self._craft_hook(topic, all_texts)
-        body    = self._craft_body(all_texts[1:])
-        insight = self._craft_insight(atoms)
-        close   = self._craft_close(topic)
-
-        return f'{hook}\n\n{body}\n\n{insight}\n\n{close}'
-
-    def _craft_hook(self, topic: str, texts: list) -> str:
-        hooks = [
-            f'There is something quietly extraordinary about {topic}.',
-            f'Few things in life are as layered as {topic}.',
-            f'To truly understand {topic}, one must first appreciate its depth.',
-            f'{topic} has always carried a certain weight — one that demands attention.',
-            f'The story of {topic} is not a simple one.',
+        middle_events = [
+            f"{character} को एक पुरानी किताब मिली",
+            f"आसमान में अजीब रोशनी दिखाई दी",
+            f"गाँव में एक अनजान मेहमान आया",
+            f"{character} ने एक गुप्त गुफा की खोज की",
+            f"अचानक मौसम बदलने लगा",
         ]
-        opening = random.choice(hooks)
-        if texts:
-            opening += ' ' + texts[0]
-        return opening
 
-    def _craft_body(self, texts: list) -> str:
-        if not texts: return ''
-        parts = []
-        connectors = ([''] + self.CONNECTORS['addition'] +
-                      self.CONNECTORS['contrast'] +
-                      self.CONNECTORS['cause'])
-        for i, text in enumerate(texts[:4]):
-            conn = random.choice(connectors) if i > 0 else ''
-            parts.append(conn + text)
-        return ' '.join(parts)
+        while current_words < target_words:
+            event_choice = random.choice(middle_events)
+            middle = random.choice(self.STORY_MIDDLE).format(event=event_choice)
+            story_parts.append(middle)
+            current_words += len(middle.split())
 
-    def _craft_insight(self, atoms: list) -> str:
-        causal = [a for a in atoms if a.atom_type == AtomType.CAUSAL]
-        rules  = [a for a in atoms if a.atom_type == AtomType.RULE]
-        if causal:
-            return random.choice(self.CONNECTORS['emphasis']) + self._render_causal(causal[0])
-        if rules:
-            return random.choice(self.CONNECTORS['emphasis']) + self._render_rule(rules[0])
-        return ''
+            # Add some detail
+            detail = random.choice([
+                f"हवा में एक अजीब सी खुशबू थी।",
+                f"पक्षी चुप हो गए थे।",
+                f"दूर कहीं घंटियाँ बज रही थीं।",
+                f"{character} का दिल तेज़ी से धड़क रहा था।",
+                f"यह सब देखकर {character} हैरान था, पर डरा नहीं।",
+            ])
+            story_parts.append(detail)
+            current_words += len(detail.split())
 
-    def _craft_close(self, topic: str) -> str:
-        closes = [
-            f'And perhaps that is what makes {topic} so endlessly worth exploring.',
-            f'Such is the nature of {topic} — complex, layered, and deeply human.',
-            f'The more one looks into {topic}, the more one finds there is still to understand.',
-            f'{topic}, in the end, reveals as much about us as it does about itself.',
-        ]
-        return random.choice(closes)
+            if current_words >= target_words * 0.7:
+                break
 
-    # ── Atom renderers ────────────────────────────────────────
-    def _render_fact(self, atom) -> str:
-        c    = atom.content
-        subj = c.get('subject', '').strip()
-        pred = c.get('predicate', 'is').strip()
-        obj  = c.get('object', '').strip()
-        text = c.get('text', '').strip()
+        # Ending
+        ending = random.choice(self.STORY_ENDINGS).format(
+            character=character, lesson=lesson
+        )
+        story_parts.append(ending)
 
-        if subj and obj:
-            tmpl = random.choice(self.FACT_TEMPLATES)
-            return tmpl.format(subject=subj, predicate=pred, object=obj)
-        if text:
-            return self._polish(text)
-        return atom.to_text()
+        return "
 
-    def _render_causal(self, atom) -> str:
-        c      = atom.content
-        cause  = c.get('cause', '').strip()
-        effect = c.get('effect', '').strip()
-        if cause and effect:
-            tmpl = random.choice(self.CAUSAL_TEMPLATES)
-            return tmpl.format(cause=cause, effect=effect)
-        return atom.to_text()
-
-    def _render_rule(self, atom) -> str:
-        c    = atom.content
-        cond = c.get('condition', '').strip()
-        conc = c.get('conclusion', '').strip()
-        if cond and conc:
-            tmpl = random.choice(self.RULE_TEMPLATES)
-            return tmpl.format(condition=cond, conclusion=conc)
-        return atom.to_text()
-
-    def _render_concept(self, atom) -> str:
-        c    = atom.content
-        name = c.get('name', '').strip()
-        defn = c.get('definition', c.get('description', '')).strip()
-        if name and defn:
-            tmpl = random.choice(self.CONCEPT_TEMPLATES)
-            return tmpl.format(name=name, definition=defn)
-        return atom.to_text()
-
-    def _atom_to_sentence(self, atom) -> str:
-        t = atom.atom_type
-        if t == AtomType.FACT:    return self._render_fact(atom)
-        if t == AtomType.CAUSAL:  return self._render_causal(atom)
-        if t == AtomType.RULE:    return self._render_rule(atom)
-        if t == AtomType.CONCEPT: return self._render_concept(atom)
-        return self._polish(atom.to_text())
-
-    # ── Utilities ─────────────────────────────────────────────
-    def _polish(self, text: str) -> str:
-        if not text: return text
-        text = text.strip()
-        if text and text[0].islower():
-            text = text[0].upper() + text[1:]
-        if text and text[-1] not in '.!?':
-            text += '.'
-        return text
-
-    def _format_paragraph(self, sentences: list) -> str:
-        cleaned = [self._polish(s) for s in sentences if s and s.strip()]
-        if not cleaned: return ''
-        return ' '.join(cleaned)
-
-    def _extract_topic(self, query: str) -> str:
-        stop = {'write','a','an','the','about','on','for','me',
-                'लिखो','एक','के','बारे','में','पर'}
-        words = [w for w in query.lower().split() if w not in stop]
-        return ' '.join(words[:3]) if words else query
-
-    def _no_knowledge_response(self, query: str) -> str:
-        responses = [
-            'I do not have sufficient knowledge on this yet. Train me with relevant data.',
-            'This topic is outside my current knowledge base. Add training data to help me learn.',
-            'I am still learning about this. Provide training data and I will grow wiser.',
-        ]
-        return random.choice(responses)
+".join(story_parts)
