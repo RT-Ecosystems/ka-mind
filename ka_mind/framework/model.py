@@ -72,14 +72,12 @@ class KaModel:
     def use_github(self, command: str) -> str:
         return self.api.use_github(command)
 
-    def learn(self, text: str, use_super: bool = True) -> int:
-        """Learn from a single text. Uses SuperTeacher by default."""
-        if use_super:
-            return self.super_teacher.teach(text, self.domain)
-        else:
-            from ka_mind.training.neurabrain_teacher import NeuraBrainTeacher
-            t = NeuraBrainTeacher(self.memory, self.vector_graph)
-            return t.process_chunk(text, self.domain)
+    def learn(self, text: str) -> int:
+        """Direct learning from text using NeuraBrainTeacher"""
+        from ka_mind.training.neurabrain_teacher import NeuraBrainTeacher
+        t = NeuraBrainTeacher(self.memory, self.vector_graph)
+        n = t.process_chunk(text, self.domain)
+        return n
         return n
 
     def train_file(self, path: str, max_gb: float = None):
