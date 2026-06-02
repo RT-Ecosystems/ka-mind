@@ -17,6 +17,7 @@ from ka_mind.agents.translator_agent import TranslatorAgent
 from ka_mind.agents.time_agent       import TimeAgent
 from ka_mind.agents.api_connector_agent import APIConnectorAgent
 from ka_mind.teacher.master_teacher  import MasterTeacher
+from ka_mind.teacher.super_teacher   import SuperTeacher
 
 
 class KaModel:
@@ -63,7 +64,10 @@ class KaModel:
     def use_github(self, command: str) -> str:
         return self.api.use_github(command)
 
-    def learn(self, text: str) -> int:
+    def learn(self, text: str, use_super: bool = True) -> int:
+        if use_super:
+            return self.super_teacher.teach(text, self.domain)
+        else:
         from ka_mind.training.neurabrain_teacher import NeuraBrainTeacher
         t = NeuraBrainTeacher(self.memory, self.vector_graph)
         n = t.process_chunk(text, self.domain)
