@@ -80,13 +80,11 @@ class KaModel:
         return n
     def train_file(self, path: str, max_gb: float = None):
         from ka_mind.training.stream_trainer import StreamTrainer
-from ka_mind.training.auto_stream_trainer import AutoStreamTrainer
         StreamTrainer(self.memory, self.vector_graph,
                       domain=self.domain).train_from_file(path, max_gb)
 
     def train_drive(self, folder: str, max_gb: float = None):
         from ka_mind.training.stream_trainer import StreamTrainer
-from ka_mind.training.auto_stream_trainer import AutoStreamTrainer
         StreamTrainer(self.memory, self.vector_graph,
                       domain=self.domain).train_from_drive(folder, max_gb)
 
