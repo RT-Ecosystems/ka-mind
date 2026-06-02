@@ -78,8 +78,6 @@ class KaModel:
         t = NeuraBrainTeacher(self.memory, self.vector_graph)
         n = t.process_chunk(text, self.domain)
         return n
-        return n
-
     def train_file(self, path: str, max_gb: float = None):
         from ka_mind.training.stream_trainer import StreamTrainer
 from ka_mind.training.auto_stream_trainer import AutoStreamTrainer
@@ -92,7 +90,7 @@ from ka_mind.training.auto_stream_trainer import AutoStreamTrainer
         StreamTrainer(self.memory, self.vector_graph,
                       domain=self.domain).train_from_drive(folder, max_gb)
 
-    
+
     def train_hf(self, dataset: str, subset: str = None,
                  max_samples: int = 100000) -> dict:
         """Train from HuggingFace dataset with streaming."""
@@ -108,7 +106,7 @@ from ka_mind.training.auto_stream_trainer import AutoStreamTrainer
         self.abstractor.create_concepts()
         self.world.discover_rules()
 
-    
+
     @property
     def atom_count(self) -> int:
         """Total Knowledge Atoms in the model (like parameter count in LLMs)."""
