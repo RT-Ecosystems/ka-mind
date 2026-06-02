@@ -32,6 +32,7 @@ def main():
             elif user_input == ':stats':
                 for k, v in model.stats().items():
                     print(f'  {k}: {v}')
+                print(f'  model: {model.model_size_str}')
 
             elif user_input.startswith(':save'):
                 path = model.save()

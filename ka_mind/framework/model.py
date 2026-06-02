@@ -88,6 +88,24 @@ class KaModel:
         self.abstractor.create_concepts()
         self.world.discover_rules()
 
+    
+    @property
+    def atom_count(self) -> int:
+        """Total Knowledge Atoms in the model (like parameter count in LLMs)."""
+        return len(self.memory.graph)
+
+    @property
+    def model_size_str(self) -> str:
+        """Human-readable model size."""
+        count = self.atom_count
+        if count >= 1_000_000_000:
+            return f"{count/1_000_000_000:.1f} Billion Atom Model"
+        elif count >= 1_000_000:
+            return f"{count/1_000_000:.1f} Million Atom Model"
+        elif count >= 1_000:
+            return f"{count/1_000:,} Atom Model"
+        return f"{count} Atom Model"
+
     def stats(self) -> dict:
         return {'name': self.name, 'version': self.version,
                 'domain': self.domain,
@@ -104,7 +122,7 @@ class KaModel:
                          'graph': self.memory.graph,
                          'edges': self.memory.edges,
                          'version': self.version}, f)
-        print(f'Saved: {fp} ({os.path.getsize(fp)/1024/1024:.1f} MB)')
+        print(f'Saved: {fp} ({os.path.getsize(fp)/1024/1024:.1f} MB) [{self.model_size_str}]')
         return fp
 
     @classmethod
