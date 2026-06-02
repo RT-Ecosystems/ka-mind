@@ -75,13 +75,22 @@ class KaModel:
 
     def train_file(self, path: str, max_gb: float = None):
         from ka_mind.training.stream_trainer import StreamTrainer
+from ka_mind.training.auto_stream_trainer import AutoStreamTrainer
         StreamTrainer(self.memory, self.vector_graph,
                       domain=self.domain).train_from_file(path, max_gb)
 
     def train_drive(self, folder: str, max_gb: float = None):
         from ka_mind.training.stream_trainer import StreamTrainer
+from ka_mind.training.auto_stream_trainer import AutoStreamTrainer
         StreamTrainer(self.memory, self.vector_graph,
                       domain=self.domain).train_from_drive(folder, max_gb)
+
+    
+    def train_hf(self, dataset: str, subset: str = None,
+                 max_samples: int = 100000) -> dict:
+        """Train from HuggingFace dataset with streaming."""
+        trainer = AutoStreamTrainer(self)
+        return trainer.train_from_hf(dataset, subset, max_samples=max_samples)
 
     def deep_sleep(self):
         self.neocortex.run_deep_sleep_cycle()
