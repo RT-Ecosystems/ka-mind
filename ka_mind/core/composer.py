@@ -1,7 +1,7 @@
 # KA-Mind Composer v2.3 — Reasoning integrated
 import random
 from .knowledge_atom import AtomType
-from .human_language_engine import HumanLanguageEngine
+from .fluid_composer import FluidComposer
 from .reasoning_engine import ReasoningEngine
 
 
