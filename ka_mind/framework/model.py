@@ -71,7 +71,6 @@ class KaModel:
     def use_github(self, command: str) -> str:
         return self.api.use_github(command)
 
-    # ====================== FIXED learn() METHOD ======================
     def learn(self, text: str) -> int:
         """Learn from text using NeuraBrainTeacher"""
         from ka_mind.training.neurabrain_teacher import NeuraBrainTeacher
