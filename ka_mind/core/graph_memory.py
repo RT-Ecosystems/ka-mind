@@ -6,6 +6,9 @@ class GraphMemory:
     def __init__(self):
         self.graph = {}
         self.edges = {}
+        from .graph_index import GraphIndex
+        self.graph_index = GraphIndex()
+        self._use_faiss = self.graph_index.is_available()
 
     def add_atom(self, atom) -> bool:
         if atom.atom_id in self.graph:
@@ -15,6 +18,9 @@ class GraphMemory:
             return False
         self.graph[atom.atom_id] = atom
         self.edges[atom.atom_id] = []
+        # Also add to FAISS index for fast search
+        if self._use_faiss and hasattr(atom, 'embedding') and atom.embedding is not None:
+            self.graph_index.add(atom.atom_id, atom.embedding)
         return True
 
     def add_relation(self, from_id: str, to_id: str,
@@ -65,9 +71,29 @@ class GraphMemory:
 
     def search_scored(self, query: str, current_user_id: str = 'system',
                       top_k: int = 15) -> list:
+        # Try FAISS semantic search first
+        if self._use_faiss and self.graph_index.size > 0:
+            try:
+                from .vector_atom import VectorAtom
+                va = VectorAtom(query)
+                qv = va.encode()
+                faiss_results = self.graph_index.search(qv, top_k * 2)
+                if faiss_results:
+                    results = []
+                    for atom_id, score in faiss_results:
+                        if atom_id in self.graph:
+                            atom = self.graph[atom_id]
+                            if atom.scope == 'public' or atom.user_id == current_user_id:
+                                results.append((atom, float(score) * atom.confidence))
+                    if results:
+                        results.sort(key=lambda x: x[1], reverse=True)
+                        return results[:top_k]
+            except Exception:
+                pass  # Fall back to keyword search
+
+        # Keyword-based search (fallback)
         qwords = set(query.lower().split())
         results = []
-        # Local variables for speed
         graph = self.graph
         for atom in graph.values():
             if atom.scope != 'public' and atom.user_id != current_user_id:
