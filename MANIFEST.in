@@ -1,0 +1,7 @@
+include README.md
+include requirements.txt
+include pyproject.toml
+include setup.py
+recursive-include ka_mind *.py
+recursive-include examples *.py
+recursive-include tests *.py

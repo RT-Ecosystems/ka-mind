@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "ka-mind"
+version = "3.1.0"
+description = "KA-Mind: NeuraBrain AI Framework — Zero-Hallucination Neuro-Symbolic AI (No LLMs, No Transformers)"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "RT-Ecosystems", email = "ka-mind@example.com"}
+]
+keywords = ["ai", "neuro-symbolic", "knowledge-atoms", "graph-memory", "reasoning", "zero-hallucination"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24.0",
+    "requests>=2.31.0",
+    "Pillow>=10.0.0",
+]
+
+[project.optional-dependencies]
+semantic = ["sentence-transformers>=2.2.0"]
+hd_image = ["diffusers", "torch"]
+fast_search = ["faiss-cpu>=1.7.4"]
+all = ["sentence-transformers>=2.2.0", "diffusers", "torch", "faiss-cpu>=1.7.4"]
+
+[project.urls]
+Homepage = "https://github.com/RT-Ecosystems/ka-mind"
+Repository = "https://github.com/RT-Ecosystems/ka-mind"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ka_mind*", "examples*", "tests*"]
