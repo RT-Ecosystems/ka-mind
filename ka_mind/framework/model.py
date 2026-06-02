@@ -32,7 +32,7 @@ class KaModel:
         self.world        = WorldModel(self.memory)
         self.abstractor   = Abstractor(self.memory)
         self.web        = WebAgent(self.memory)
-        self.code       = CodeAgent()
+        self.code       = CodeAgent()  # CodeAgent v3.0
         self.vision     = VisionAgent(self.memory)
         self.math       = MathAgent(self.memory)
         self.file_agent = FileAgent(self.memory)
