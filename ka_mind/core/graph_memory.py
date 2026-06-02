@@ -1,12 +1,11 @@
-# KA-Mind Core: Graph Memory
-# BUG FIXED: Added real graph edges + retrieve_context() method
-# BUG FIXED: Privacy-aware search
-
+# KA-Mind Core: Graph Memory (CPU Optimized)
+import time
+from .knowledge_atom import AtomType
 
 class GraphMemory:
     def __init__(self):
-        self.graph = {}           # atom_id -> KnowledgeAtom
-        self.edges = {}           # atom_id -> [{target, relation, strength}]
+        self.graph = {}
+        self.edges = {}
 
     def add_atom(self, atom) -> bool:
         if atom.atom_id in self.graph:
@@ -18,7 +17,8 @@ class GraphMemory:
         self.edges[atom.atom_id] = []
         return True
 
-    def add_relation(self, from_id: str, to_id: str, relation: str = 'related', strength: float = 1.0):
+    def add_relation(self, from_id: str, to_id: str,
+                     relation: str = 'related', strength: float = 1.0):
         self.add_edge(from_id, to_id, relation, strength)
 
     def add_edge(self, from_id: str, to_id: str,
@@ -30,13 +30,12 @@ class GraphMemory:
             if from_id in self.graph:
                 self.graph[from_id].connect(to_id, relation, strength)
 
-    # BUG2 FIXED: retrieve_context was missing — now implemented
     def retrieve_context(self, start_atom_id: str, depth: int = 2):
         if start_atom_id not in self.graph:
             return []
         visited = set()
         frontier = [start_atom_id]
-        results  = []
+        results = []
         for _ in range(depth):
             next_frontier = []
             for aid in frontier:
@@ -66,9 +65,11 @@ class GraphMemory:
 
     def search_scored(self, query: str, current_user_id: str = 'system',
                       top_k: int = 15) -> list:
-        qwords  = set(query.lower().split())
+        qwords = set(query.lower().split())
         results = []
-        for atom in self.graph.values():
+        # Local variables for speed
+        graph = self.graph
+        for atom in graph.values():
             if atom.scope != 'public' and atom.user_id != current_user_id:
                 continue
             awords = set(atom.to_text().lower().split())

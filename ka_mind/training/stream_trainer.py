@@ -1,6 +1,5 @@
-# KA-Mind Stream Trainer — RAM-efficient training
-# Streams data chunk by chunk: 100TB on 16GB RAM
-import os, time
+# KA-Mind Stream Trainer v2.4 — mmap for large files
+import os, time, mmap
 from ka_mind.training.neurabrain_teacher import NeuraBrainTeacher
 
 
@@ -15,21 +14,41 @@ class StreamTrainer:
     def train_from_file(self, file_path: str, max_gb: float = None):
         if not os.path.exists(file_path):
             print(f'File not found: {file_path}'); return
-        print(f'Streaming training: {file_path}')
+        file_size = os.path.getsize(file_path)
+        print(f'Streaming training: {file_path} ({file_size/1024**3:.2f} GB)')
         self._t0 = time.time()
         max_bytes = int(max_gb * 1024**3) if max_gb else None
         buf = ''
-        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            for line in f:
-                buf += line
-                self._bytes += len(line.encode('utf-8'))
-                if max_bytes and self._bytes >= max_bytes:
-                    self._process(buf); break
-                if len(buf.encode('utf-8')) >= self.chunk_size:
+        # Use mmap for large files
+        if file_size > 10 * 1024 * 1024:  # > 10 MB
+            with open(file_path, 'r+b') as f:
+                with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                    for line in iter(mm.readline, b''):
+                        try:
+                            line_str = line.decode('utf-8', errors='ignore')
+                        except:
+                            continue
+                        buf += line_str
+                        self._bytes += len(line_str.encode('utf-8'))
+                        if max_bytes and self._bytes >= max_bytes:
+                            self._process(buf); break
+                        if len(buf.encode('utf-8')) >= self.chunk_size:
+                            self._process(buf)
+                            buf = ''
+                    if buf.strip() and (not max_bytes or self._bytes < max_bytes):
+                        self._process(buf)
+        else:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                for line in f:
+                    buf += line
+                    self._bytes += len(line.encode('utf-8'))
+                    if max_bytes and self._bytes >= max_bytes:
+                        self._process(buf); break
+                    if len(buf.encode('utf-8')) >= self.chunk_size:
+                        self._process(buf)
+                        buf = ''
+                if buf.strip():
                     self._process(buf)
-                    buf = ''
-            if buf.strip():
-                self._process(buf)
         self._summary()
 
     def train_from_drive(self, folder: str, max_gb: float = None):
@@ -51,7 +70,8 @@ class StreamTrainer:
                 try:
                     content = open(os.path.join(root_d, fn),
                                    'r', encoding='utf-8', errors='ignore').read()
-                    buf += content + '\n'
+                    buf += content + '
+'
                     self._bytes += len(content.encode('utf-8'))
                 except Exception: pass
                 if max_bytes and self._bytes >= max_bytes: break
@@ -71,7 +91,7 @@ class StreamTrainer:
         new_atoms = self.teacher.process_chunk(text, self.domain)
         self._chunks += 1
         self._atoms  += new_atoms
-        del text  # free RAM immediately
+        del text
         if self._chunks % 10 == 0:
             el = time.time() - self._t0
             gb = self._bytes / 1024**3
