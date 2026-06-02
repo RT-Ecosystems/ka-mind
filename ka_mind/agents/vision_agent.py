@@ -6,6 +6,10 @@ class VisionAgent:
     def generate_image(self, prompt: str, output: str='output.png') -> str:
         try:
             from PIL import Image, ImageDraw
+        except ImportError:
+            return 'Pillow not installed. Run: pip install Pillow'
+        try:
+            from PIL import Image, ImageDraw
             import hashlib
             hx = int(hashlib.md5(prompt.encode()).hexdigest(),16)
             r,g,b = (hx>>16)&0xFF,(hx>>8)&0xFF,hx&0xFF

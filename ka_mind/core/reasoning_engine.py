@@ -26,7 +26,7 @@ class ReasoningEngine:
 
             # HOTFIX: lowered from 0.6 to 0.4
             query_match = len(qw & cw) / max(len(cw), 1)
-            if query_match >= 0.4:
+            if query_match >= 0.3:
                 # Find supporting fact
                 best_fact = None
                 best_score = 0.0
@@ -94,7 +94,7 @@ class ReasoningEngine:
                 if score > best_score:
                     best_score = best_match, best_match = (cause, effect), None
                     best_score, best_match = score, (cause, effect)
-            if best_match and best_score >= 0.4:
+            if best_match and best_score >= 0.3:
                 cause, effect = best_match
                 chain.append(f'  -> {effect}')
                 visited.add(cause)

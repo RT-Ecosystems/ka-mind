@@ -1,6 +1,6 @@
 # KA-Mind Web Agent — DuckDuckGo + Cache
 # FIX: Checks memory cache before calling DDG (no repeated calls!)
-import urllib.request, urllib.parse, json, time
+import urllib.request, urllib.parse, urllib.error, json, time
 from ka_mind.core.knowledge_atom import KnowledgeAtom, AtomType
 
 
@@ -60,7 +60,7 @@ class WebAgent:
                           if isinstance(t,dict)]
                 text = ' '.join(texts)
             return text.strip()
-        except Exception as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as e:
             return ''
 
     def _save_to_memory(self, query: str, text: str):
@@ -90,5 +90,5 @@ class WebAgent:
             self._save_to_memory(url, text[:1000])
             self._call_log[url.lower()] = time.time()
             return text
-        except Exception as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as e:
             return f'URL read failed: {e}'
