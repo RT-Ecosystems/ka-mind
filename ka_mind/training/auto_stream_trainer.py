@@ -160,6 +160,38 @@ class AutoStreamTrainer:
 
         return self._summary()
 
+    
+    def train_and_test(self, dataset_name: str, subset: str = None,
+                       max_samples: int = 50000, test_queries: list = None) -> dict:
+        """Train and then automatically test the model."""
+        # Train
+        result = self.train_from_hf(dataset_name, subset, max_samples=max_samples)
+
+        # Default test queries
+        if test_queries is None:
+            test_queries = [
+                "What is water?",
+                "Tell me about India.",
+                "What causes gravity?",
+                "Write a short poem about nature.",
+                "If water freezes, what happens?",
+            ]
+
+        # Test
+        print(f"\n{'='*55}")
+        print(f"  🧪 Auto-Testing Model")
+        print(f"{'='*55}")
+        test_results = []
+        for q in test_queries:
+            answer = self.model.think(q)
+            test_results.append({"query": q, "response": answer[:200]})
+            print(f"\n  Q: {q}")
+            print(f"  A: {answer[:150]}...")
+
+        result["tests"] = test_results
+        result["test_count"] = len(test_results)
+        return result
+
     def _summary(self) -> dict:
         elapsed = time.time() - self._t0
         print(f"

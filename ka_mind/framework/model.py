@@ -6,6 +6,8 @@ from ka_mind.core.neocortex          import Neocortex
 from ka_mind.core.reasoning_engine   import ReasoningEngine
 from ka_mind.core.composer           import Composer
 from ka_mind.core.world_model        import WorldModel
+from ka_mind.core.knowledge_pack     import KnowledgePack
+from ka_mind.core.inference_cache   import InferenceCache
 from ka_mind.core.abstractor         import Abstractor
 from ka_mind.agents.web_agent        import WebAgent
 from ka_mind.agents.code_agent       import CodeAgent
@@ -27,6 +29,7 @@ class KaModel:
         self.version  = '2.3'
         self.memory       = GraphMemory()
         self.vector_graph = VectorGraph()
+        self.cache = InferenceCache()
         self.neocortex    = Neocortex(self.memory)
         self.reasoner     = ReasoningEngine(self.memory)
         self.composer     = Composer(self.memory)
@@ -50,7 +53,12 @@ class KaModel:
         print(f'KaModel {name} v{self.version} | domain={domain} | 10 agents | reasoning active')
 
     def think(self, q: str, user_id: str = 'system') -> str:
-        return self.teacher.process_request(q, user_id)
+        cached = self.cache.get(q)
+        if cached:
+            return cached
+        answer = self.teacher.process_request(q, user_id)
+        self.cache.set(q, answer)
+        return answer
 
     def reason(self, query: str) -> str:
         return self.reasoner.reason(query)
@@ -91,6 +99,10 @@ from ka_mind.training.auto_stream_trainer import AutoStreamTrainer
         """Train from HuggingFace dataset with streaming."""
         trainer = AutoStreamTrainer(self)
         return trainer.train_from_hf(dataset, subset, max_samples=max_samples)
+
+    def load_knowledge_packs(self) -> int:
+        """Load pre-built general knowledge."""
+        return KnowledgePack.load_all(self.memory)
 
     def deep_sleep(self):
         self.neocortex.run_deep_sleep_cycle()

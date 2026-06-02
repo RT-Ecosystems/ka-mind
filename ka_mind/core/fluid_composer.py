@@ -115,6 +115,26 @@ class FluidComposer:
             verb = random.choice(self.VERBS_CAUSE_EN)
             return f"{effect} happens {verb} {cause}"
 
+    
+    def compose_with_style(self, query: str, atoms: list, style: str = "casual") -> str:
+        """Generate response in a specific writing style."""
+        profile = self.style_rules.get(style)
+        if not profile:
+            return self.compose(query, atoms)
+
+        opener = random.choice(profile.openers) if profile.openers else ""
+        facts = [a for a in atoms if a.atom_type == AtomType.FACT][:3]
+        causal = [a for a in atoms if a.atom_type == AtomType.CAUSAL][:2]
+
+        parts = [opener]
+        for atom in facts:
+            parts.append(self._compose_fact(atom, self._detect_language(query)))
+        for atom in causal:
+            parts.append(self._compose_causal(atom, self._detect_language(query)))
+
+        ending = random.choice(profile.endings) if profile.endings else "."
+        return " ".join(parts) + ending
+
     def generate_novel(self, prompt: str, atoms: list, length: int = 600) -> str:
         """Generate a full novel without templates — using grammar composition."""
         lang = self._detect_language(prompt)
